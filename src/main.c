@@ -6,6 +6,7 @@
 #include <string.h>
 #include <libgen.h>
 #include <linux/limits.h>
+#include <termios.h>
 
 /*
   Function Declarations for builtin shell commands:
@@ -236,6 +237,15 @@ void wosh_loop(void)
   } while (status);
 }
 
+struct termios orig_termios;
+void setup_esc_sequences(void){
+  tcgetattr(STDIN_FILENO, &orig_termios);
+  orig_termios.c_lflag &= ~(ISIG);
+
+  tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+  
+
 /**
    @brief Main entry point.
    @param argc Argument count.
@@ -244,6 +254,9 @@ void wosh_loop(void)
  */
 int main(int argc, char **argv)
 {
+  // run setup
+  setup_esc_sequences();
+
   // Load config files, if any.
 
   // Run command loop.
