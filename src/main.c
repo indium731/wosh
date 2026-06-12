@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <libgen.h>
-#include <linux/limits.h>
+#include <limits.h>
 #include <termios.h>
 #include <errno.h>
 
@@ -31,7 +31,7 @@ typedef struct job
   pid_t pgid;                 /* process group ID */
   char notified;              /* true if user told about stopped job */
   struct termios tmodes;      /* saved terminal modes */
-  int stdin, stdout, stderr;  /* standard i/o channels */
+  int standardin, standardout, standarderror;  /* standard i/o channels */
 } job;
 
 job *first_job = NULL;
@@ -292,7 +292,7 @@ launch_job (job *j, int foreground)
   pid_t pid;
   int mypipe[2], infile, outfile;
 
-  infile = j->stdin;
+  infile = j->standardin;
   for (p = j->first_process; p; p = p->next)
     {
       /* Set up pipes, if necessary.  */
@@ -306,14 +306,14 @@ launch_job (job *j, int foreground)
           outfile = mypipe[1];
         }
       else
-        outfile = j->stdout;
+        outfile = j->standardout;
 
       /* Fork the child processes.  */
       pid = fork ();
       if (pid == 0)
         /* This is the child process.  */
         launch_process (p, j->pgid, infile,
-                        outfile, j->stderr, foreground);
+                        outfile, j->standarderror, foreground);
       else if (pid < 0)
         {
           /* The fork failed.  */
@@ -333,9 +333,9 @@ launch_job (job *j, int foreground)
         }
 
       /* Clean up after pipes.  */
-      if (infile != j->stdin)
+      if (infile != j->standardin)
         close (infile);
-      if (outfile != j->stdout)
+      if (outfile != j->standardout)
         close (outfile);
       infile = mypipe[0];
     }
@@ -402,7 +402,7 @@ update_status (void)
   pid_t pid;
 
   do
-    pid = waitpid (WAIT_ANY, &status, WUNTRACED|WNOHANG);
+    pid = waitpid (-1, &status, WUNTRACED|WNOHANG);
   while (!mark_process_status (pid, status));
 }
 
@@ -414,7 +414,7 @@ wait_for_job (job *j)
   pid_t pid;
 
   do
-    pid = waitpid (WAIT_ANY, &status, WUNTRACED);
+    pid = waitpid (-1, &status, WUNTRACED);
   while (!mark_process_status (pid, status)
          && !job_is_stopped (j)
          && !job_is_completed (j));
@@ -526,7 +526,7 @@ int wosh_execute(char **args)
 char *wosh_read_line(void)
 {
   char *line = NULL;
-  ssize_t bufsize = 0; // have getline allocate a buffer for us
+  size_t bufsize = 0; // have getline allocate a buffer for us
   if (getline(&line, &bufsize, stdin) == -1) {
     if (feof(stdin)) {
       exit(EXIT_SUCCESS);  // We received an EOF
@@ -608,8 +608,8 @@ void wosh_loop(void)
       perror("getcwd() error");
       return;
     }
-    char* dir = strcat(basename(cwd), " > ");
-    printf(dir);
+		printf("%s > ", basename(cwd));
+		fflush(stdout);
     line = wosh_read_line();
     args = wosh_split_line(line);
     status = wosh_execute(args);
