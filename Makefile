@@ -6,7 +6,7 @@ SRC_DIR = src
 
 CC = gcc
 
-CFLAGS = -Wextra -Wall
+CFLAGS = -Wextra -Wall -g
 
 OUT_FILE = wosh
 

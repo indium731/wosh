@@ -48,7 +48,6 @@ int shell_is_interactive;
 void put_job_in_foreground (job *j, int cont);
 void put_job_in_background (job *j, int cont);
 void wait_for_job (job* j);
-void format_job_info (job *j, const char *status);
 
 /*
   Function Declarations for builtin shell commands:
@@ -120,11 +119,10 @@ int wosh_help(char **args)
 /**
    @brief Builtin command: exit.
    @param args List of args.  Not examined.
-   @return Always returns 0, to terminate execution.
  */
 int wosh_exit(char **args)
 {
-  return 0;
+	exit (0);
 }
 
 
@@ -167,36 +165,6 @@ job_is_completed (job *j)
   return 1;
 }
 
-/**
-  @brief Launch a program and wait for it to terminate.
-  @param args Null terminated list of arguments (including program).
-  @return Always returns 1, to continue execution.
- */
-
-int wosh_launch(char **args)
-{
-  pid_t pid;
-  int status;
-
-  pid = fork();
-  if (pid == 0) {
-    // Child process
-    if (execvp(args[0], args) == -1) {
-      perror("wosh");
-    }
-    exit(EXIT_FAILURE);
-  } else if (pid < 0) {
-    // Error forking
-    perror("wosh");
-  } else {
-    // Parent process
-    do {
-      waitpid(pid, &status, WUNTRACED);
-    } while (!WIFEXITED(status) && !WIFSIGNALED(status));
-  }
-
-  return 1;
-}
 void
 put_job_in_foreground (job *j, int cont)
 {
@@ -279,6 +247,14 @@ launch_process (process *p, pid_t pgid,
       close (errfile);
     }
 
+	//check if the process to be launched is part of the builtins
+	//if so just return since this is run from a fork and so the parent process should run the builtin
+  for (int i = 0; i < wosh_num_builtins(); i++) {
+    if (strcmp(p->argv[0], builtin_str[i]) == 0) {
+			return;
+    }
+  }
+
   /* Exec the new process.  Make sure we exit.  */
   execvp (p->argv[0], p->argv);
   perror ("execvp");
@@ -323,6 +299,13 @@ launch_job (job *j, int foreground)
       else
         {
           /* This is the parent process.  */
+					//check if the process to be launched is part of the builtins
+					for (int i = 0; i < wosh_num_builtins(); i++) {
+						if (strcmp(p->argv[0], builtin_str[i]) == 0) {
+							(*builtin_func[i])(p->argv);
+							return;
+						}
+					}
           p->pid = pid;
           if (shell_is_interactive)
             {
@@ -340,7 +323,6 @@ launch_job (job *j, int foreground)
       infile = mypipe[0];
     }
 
-  format_job_info (j, "launched");
 
   if (!shell_is_interactive)
     wait_for_job (j);
@@ -421,14 +403,6 @@ wait_for_job (job *j)
 }
 
 
-/* Format information about job status for the user to look at.  */
-
-void
-format_job_info (job *j, const char *status)
-{
-  fprintf (stderr, "%ld (%s): %s\n", (long)j->pgid, status, j->command);
-}
-
 
 /* Notify the user about stopped or terminated jobs.
    Delete terminated jobs from the active job list.  */
@@ -449,7 +423,6 @@ do_job_notification (void)
       /* If all processes have completed, tell the user the job has
          completed and delete it from the list of active jobs.  */
       if (job_is_completed (j)) {
-        format_job_info (j, "completed");
         if (jlast)
           jlast->next = jnext;
         else
@@ -460,7 +433,6 @@ do_job_notification (void)
       /* Notify the user about stopped jobs,
          marking them so that we won’t do this more than once.  */
       else if (job_is_stopped (j) && !j->notified) {
-        format_job_info (j, "stopped");
         j->notified = 1;
         jlast = j;
       }
@@ -496,28 +468,6 @@ continue_job (job *j, int foreground)
 
 
 
-/**
-   @brief Execute shell built-in or launch program.
-   @param args Null terminated list of arguments.
-   @return 1 if the shell should continue running, 0 if it should terminate
- */
-int wosh_execute(char **args)
-{
-  int i;
-
-  if (args[0] == NULL) {
-    // An empty command was entered.
-    return 1;
-  }
-
-  for (i = 0; i < wosh_num_builtins(); i++) {
-    if (strcmp(args[0], builtin_str[i]) == 0) {
-      return (*builtin_func[i])(args);
-    }
-  }
-
-  return wosh_launch(args);
-}
 
 /**
    @brief Read a line of input from stdin.
@@ -589,6 +539,33 @@ char **wosh_split_line(char *line)
   return tokens;
 }
 
+/*
+ *
+ * create a job based on tokenized user input
+ *
+ */
+
+job *wosh_create_job (char** tokens)
+{
+
+	process *new_process;
+
+	new_process = (process*)malloc(sizeof(process));
+	new_process->argv = tokens;
+
+	job *new_job;
+
+	new_job = (job*)malloc(sizeof(job));
+	new_job->first_process = new_process;
+	new_job->standardin = 0;
+	new_job->standardout = 1;
+	new_job->standarderror = 2;
+
+
+	return new_job;
+
+}
+
 /**
    @brief Loop getting input and executing it.
  */
@@ -598,6 +575,7 @@ void wosh_loop(void)
   char **args;
   int status;
   char cwd[PATH_MAX];
+	job *curr_job;
   if (getcwd(cwd, sizeof(cwd)) == NULL) {
     perror("getcwd() error");
     return;
@@ -612,7 +590,11 @@ void wosh_loop(void)
 		fflush(stdout);
     line = wosh_read_line();
     args = wosh_split_line(line);
-    status = wosh_execute(args);
+
+		curr_job = wosh_create_job(args);
+		launch_job(curr_job, 1);
+
+    //status = wosh_execute(args);
 
     free(line);
     free(args);
@@ -669,11 +651,6 @@ init_wosh()
       tcgetattr (shell_terminal, &shell_tmodes);
     }
 }
-  
-/* 
- * signal handlers
- */
-
   
 
 /**
