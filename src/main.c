@@ -541,22 +541,62 @@ char **wosh_split_line(char *line)
 
 /*
  *
- * create a job based on tokenized user input
+ * create a list of processes based on tokenized input
  *
  */
 
-job *wosh_create_job (char** tokens)
+#define WOSH_PIPE '|'
+
+process *wosh_create_processes(char **tokens)
 {
+	char *curr_pointer = tokens[0];
+	int args_counter = 0;
+	int process_counter = 1;
+	process *processes;
+	processes = (process*)malloc(sizeof(process));
 
-	process *new_process;
+	while (curr_pointer)
+	{
+		if (*curr_pointer == WOSH_PIPE)
+		{
+			processes = (process*)realloc(processes, (process_counter+1) * sizeof(process));
+			tokens[args_counter] = NULL;
+			processes[process_counter-1].argv = tokens;
+			tokens = &tokens[args_counter+1];
+			process_counter++;
+			args_counter = 0;
 
-	new_process = (process*)malloc(sizeof(process));
-	new_process->argv = tokens;
+		}
+		args_counter++;
+		curr_pointer = tokens[args_counter];
+	}
+	processes[process_counter-1].argv = tokens;
+
+	for (int i = 0;i < process_counter -1; i++)
+	{
+		processes[i].next = &processes[i+1];
+	}
+
+	processes[process_counter - 1].next = NULL;
+
+	return processes;
+}
+
+
+
+/*
+ *
+ * create a job based on processes
+ *
+ */
+
+job *wosh_create_job (process *processes)
+{
 
 	job *new_job;
 
 	new_job = (job*)malloc(sizeof(job));
-	new_job->first_process = new_process;
+	new_job->first_process = processes;
 	new_job->standardin = 0;
 	new_job->standardout = 1;
 	new_job->standarderror = 2;
@@ -576,6 +616,7 @@ void wosh_loop(void)
   int status;
   char cwd[PATH_MAX];
 	job *curr_job;
+	process *processes;
   if (getcwd(cwd, sizeof(cwd)) == NULL) {
     perror("getcwd() error");
     return;
@@ -590,8 +631,8 @@ void wosh_loop(void)
 		fflush(stdout);
     line = wosh_read_line();
     args = wosh_split_line(line);
-
-		curr_job = wosh_create_job(args);
+		processes = wosh_create_processes(args);
+		curr_job = wosh_create_job(processes);
 		launch_job(curr_job, 1);
 
     //status = wosh_execute(args);
