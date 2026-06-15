@@ -522,7 +522,7 @@ char **wosh_split_line(char *line)
       tokens_backup = tokens;
       tokens = realloc(tokens, bufsize * sizeof(char*));
       if (!tokens) {
-		free(tokens_backup);
+				free(tokens_backup);
         exit(EXIT_FAILURE);
       }
     }
@@ -554,12 +554,28 @@ process *wosh_create_processes(char **tokens)
 	int process_counter = 1;
 	process *processes;
 	processes = (process*)malloc(sizeof(process));
+	process **processes_backup;
+
+	if (!processes)
+	{
+		fprintf(stderr, "wosh: allocation error\n");
+		exit(EXIT_FAILURE);
+	}
 
 	while (curr_pointer)
 	{
 		if (*curr_pointer == WOSH_PIPE)
 		{
+
+			processes_backup = processes;
 			processes = (process*)realloc(processes, (process_counter+1) * sizeof(process));
+
+			if (!processes)
+			{
+				free(processes_backup);
+				exit(EXIT_FAILURE);
+			}
+
 			tokens[args_counter] = NULL;
 			processes[process_counter-1].argv = tokens;
 			tokens = &tokens[args_counter+1];
@@ -596,6 +612,14 @@ job *wosh_create_job (process *processes)
 	job *new_job;
 
 	new_job = (job*)malloc(sizeof(job));
+
+	if (!new_job)
+	{
+		fprintf(stderr, "wosh: allocation error");
+		exit (EXIT_FAILURE);
+	}
+
+
 	new_job->first_process = processes;
 	new_job->standardin = 0;
 	new_job->standardout = 1;
