@@ -251,7 +251,8 @@ launch_process (process *p, pid_t pgid,
 	//if so just return since this is run from a fork and so the parent process should run the builtin
   for (int i = 0; i < wosh_num_builtins(); i++) {
     if (strcmp(p->argv[0], builtin_str[i]) == 0) {
-			return;
+			perror ("execvp");
+			exit (1);
     }
   }
 
@@ -284,6 +285,13 @@ launch_job (job *j, int foreground)
       else
         outfile = j->standardout;
 
+			//check if the process to be launched is part of the builtins
+			for (int i = 0; i < wosh_num_builtins(); i++) {
+				if (strcmp(p->argv[0], builtin_str[i]) == 0) {
+					(*builtin_func[i])(p->argv);
+					return;
+				}
+			}
       /* Fork the child processes.  */
       pid = fork ();
       if (pid == 0)
@@ -299,13 +307,6 @@ launch_job (job *j, int foreground)
       else
         {
           /* This is the parent process.  */
-					//check if the process to be launched is part of the builtins
-					for (int i = 0; i < wosh_num_builtins(); i++) {
-						if (strcmp(p->argv[0], builtin_str[i]) == 0) {
-							(*builtin_func[i])(p->argv);
-							return;
-						}
-					}
           p->pid = pid;
           if (shell_is_interactive)
             {
