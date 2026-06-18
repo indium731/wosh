@@ -554,7 +554,7 @@ process *wosh_create_processes(char **tokens)
 	int process_counter = 1;
 	process *processes;
 	processes = (process*)malloc(sizeof(process));
-	process **processes_backup;
+	process *processes_backup;
 
 	if (!processes)
 	{
