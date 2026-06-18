@@ -637,14 +637,9 @@ void wosh_loop(void)
 {
   char *line;
   char **args;
-  int status;
   char cwd[PATH_MAX];
 	job *curr_job;
 	process *processes;
-  if (getcwd(cwd, sizeof(cwd)) == NULL) {
-    perror("getcwd() error");
-    return;
-  }
 
   do {
     if (getcwd(cwd, sizeof(cwd)) == NULL) {
@@ -659,11 +654,9 @@ void wosh_loop(void)
 		curr_job = wosh_create_job(processes);
 		launch_job(curr_job, 1);
 
-    //status = wosh_execute(args);
-
     free(line);
     free(args);
-  } while (status);
+  } while (1);
 }
 
 /* 
