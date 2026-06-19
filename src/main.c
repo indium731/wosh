@@ -52,9 +52,10 @@ void wait_for_job (job* j);
 /*
   Function Declarations for builtin shell commands:
  */
-int wosh_cd(char **args);
-int wosh_help(char **args);
-int wosh_exit(char **args);
+int wosh_cd(char **args, int infile, int outfile, int errfile);
+int wosh_help(char **args, int infile, int outfile, int errfile);
+int wosh_exit(char **args, int infile, int outfile, int errfile);
+int wosh_echo(char **args, int infile, int outfile, int errfile);
 
 
 /*
@@ -63,13 +64,15 @@ int wosh_exit(char **args);
 char *builtin_str[] = {
   "cd",
   "help",
-  "exit"
+  "exit",
+	"echo"
 };
 
-int (*builtin_func[]) (char **) = {
+int (*builtin_func[]) (char **, int, int , int) = {
   &wosh_cd,
   &wosh_help,
-  &wosh_exit
+  &wosh_exit,
+	&wosh_echo
 };
 
 int wosh_num_builtins() {
@@ -85,7 +88,7 @@ int wosh_num_builtins() {
    @param args List of args.  args[0] is "cd".  args[1] is the directory.
    @return Always returns 1, to continue executing.
  */
-int wosh_cd(char **args)
+int wosh_cd(char **args, int infile, int outfile, int errfile)
 {
   if (args[1] == NULL) {
     fprintf(stderr, "wosh: expected argument to \"cd\"\n");
@@ -102,17 +105,17 @@ int wosh_cd(char **args)
    @param args List of args.  Not examined.
    @return Always returns 1, to continue executing.
  */
-int wosh_help(char **args)
+int wosh_help(char **args, int infile, int outfile, int errfile)
 {
   int i;
-  printf("Type program names and arguments, and hit enter.\n");
-  printf("The following are built in:\n");
+  fprintf(stdout, "Type program names and arguments, and hit enter.\n");
+  fprintf(stdout, "The following are built in:\n");
 
   for (i = 0; i < wosh_num_builtins(); i++) {
     printf("  %s\n", builtin_str[i]);
   }
 
-  printf("Use the man command for information on other programs.\n");
+  fprintf(stdout, "Use the man command for information on other programs.\n");
   return 1;
 }
 
@@ -120,11 +123,30 @@ int wosh_help(char **args)
    @brief Builtin command: exit.
    @param args List of args.  Not examined.
  */
-int wosh_exit(char **args)
+int wosh_exit(char **args, int infile, int outfile, int errfile)
 {
 	exit (0);
 }
 
+
+/**
+   @brief Builtin command: echo.
+   @param args List of args.  Not examined.
+ */
+int wosh_echo (char **args, int infile, int outfile, int errfile)
+{
+	int i = 1;
+	while (args[i])
+	{
+		write(outfile, args[i], strlen(args[i]));
+		if (args[i+1])
+			write(outfile, " ", 1);
+		i++;
+	}
+	write(outfile, "\n", 1);
+
+	return 1;
+}
 
 
 /* 
@@ -251,7 +273,6 @@ launch_process (process *p, pid_t pgid,
 	//if so just return since this is run from a fork and so the parent process should run the builtin
   for (int i = 0; i < wosh_num_builtins(); i++) {
     if (strcmp(p->argv[0], builtin_str[i]) == 0) {
-			perror ("execvp");
 			exit (1);
     }
   }
@@ -288,8 +309,8 @@ launch_job (job *j, int foreground)
 			//check if the process to be launched is part of the builtins
 			for (int i = 0; i < wosh_num_builtins(); i++) {
 				if (strcmp(p->argv[0], builtin_str[i]) == 0) {
-					(*builtin_func[i])(p->argv);
-					return;
+					(*builtin_func[i])(p->argv, infile, outfile, j->standarderror);
+					continue;
 				}
 			}
       /* Fork the child processes.  */
