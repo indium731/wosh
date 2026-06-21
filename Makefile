@@ -1,21 +1,24 @@
-FILE_TO_BUILD = main.c
-
-BUILD_DIR = .build
+CC = gcc
+CFLAGS = -Wall -Wextra -g
 
 SRC_DIR = src
-
-CC = gcc
-
-CFLAGS = -Wextra -Wall -g
-
+BUILD_DIR = .build
 OUT_FILE = wosh
 
-all:
-	$(CC) $(SRC_DIR)/$(FILE_TO_BUILD) -o $(BUILD_DIR)/$(OUT_FILE) $(CFLAGS)
+SRCS = $(wildcard $(SRC_DIR)/*.c)
+OBJS = $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
+
+all: $(BUILD_DIR)/$(OUT_FILE)
+
+$(BUILD_DIR)/$(OUT_FILE): $(OBJS)
+	$(CC) $(OBJS) -o $@
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c
+	mkdir -p $(BUILD_DIR)
+	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm $(BUILD_DIR)/$(OUT_FILE)
+	rm -rf $(BUILD_DIR)
 
-run:
+run: all
 	./$(BUILD_DIR)/$(OUT_FILE)
-
