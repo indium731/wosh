@@ -536,7 +536,13 @@ char **wosh_split_line(char *line)
   token = strtok(line, WOSH_TOK_DELIM);
   line_start = &line_start[strcspn(line_start, WOSH_TOK_DELIM)]+1;
   while (token != NULL) {
-    tokens[position] = token;
+
+		if (token[0] == '~')
+		{
+			tokens[position] = getenv("HOME");
+		}else{
+    	tokens[position] = token;
+		}
     position++;
 
     if (position >= bufsize) {
@@ -549,12 +555,13 @@ char **wosh_split_line(char *line)
       }
     }
 
+
     if (line_start[0] == '\''){
 	    token = strtok(&line_start[1], "\'");
 	    line_start = &line_start[strcspn(&line_start[1], "\'")]+1;
     }else{
     	token = strtok(NULL, WOSH_TOK_DELIM);
-	line_start = &line_start[strcspn(line_start, WOSH_TOK_DELIM)]+1;
+			line_start = &line_start[strcspn(line_start, WOSH_TOK_DELIM)]+1;
     }
   }
   tokens[position] = NULL;
