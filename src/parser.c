@@ -12,6 +12,7 @@
 #include "job.h"
 #include "launch.h"
 #include "builtins.h"
+#include "environment.h"
 
 /**
    @brief Read a line of input from stdin.
@@ -62,6 +63,15 @@ char **wosh_split_line(char *line)
 		if (token[0] == '~')
 		{
 			tokens[position] = getenv("HOME");
+		}else if (token[0] == '$'){
+			//check if its a environment variable
+			for (int i = 0; i < wosh_num_environvar(); i++)
+			{
+				if (strcmp(&token[1], environvar_str[i]) == 0)
+				{
+					tokens[position] = (*environvar_func[i])();
+				}
+			}
 		}else{
     	tokens[position] = token;
 		}
