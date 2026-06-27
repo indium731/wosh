@@ -108,6 +108,7 @@ char **wosh_split_line(char *line)
  */
 
 #define WOSH_PIPE '|'
+#define WOSH_REDIRECTION '>'
 
 process *wosh_create_processes(char **tokens)
 {
@@ -116,6 +117,7 @@ process *wosh_create_processes(char **tokens)
 	int process_counter = 1;
 	process *processes;
 	processes = (process*)malloc(sizeof(process));
+	processes[0].argv = NULL;
 	process *processes_backup;
 
 	if (!processes)
@@ -140,15 +142,40 @@ process *wosh_create_processes(char **tokens)
 
 			tokens[args_counter] = NULL;
 			processes[process_counter-1].argv = tokens;
+			processes[process_counter-1].infile = NULL;
+			processes[process_counter-1].outfile = NULL;
+			processes[process_counter-1].errorfile = NULL;
 			tokens = &tokens[args_counter+1];
 			process_counter++;
 			args_counter = 0;
 
-		}
+		} else if (*curr_pointer == WOSH_REDIRECTION)
+			{
+    		if (tokens[args_counter + 1] == NULL) 
+				{
+        	fprintf(stderr, "syntax error: expected filename after >\n");
+        	return NULL;
+    		}
+
+    		processes[process_counter - 1].outfile = tokens[args_counter + 1];
+
+    		tokens[args_counter] = NULL;
+
+    		// after filename, only NULL or pipe should be allowed
+    		if (tokens[args_counter + 2] != NULL &&
+        	tokens[args_counter + 2][0] != WOSH_PIPE) 
+				{
+        	fprintf(stderr, "syntax error: unexpected token after redirection filename: %s\n",
+                tokens[args_counter + 2]);
+        	return NULL;
+    		}
+    		args_counter += 2;
+			}
 		args_counter++;
 		curr_pointer = tokens[args_counter];
 	}
-	processes[process_counter-1].argv = tokens;
+	if (!processes[process_counter-1].argv)
+		processes[process_counter-1].argv = tokens;
 
 	for (int i = 0;i < process_counter -1; i++)
 	{
@@ -186,7 +213,6 @@ job *wosh_create_job (process *processes)
 	new_job->standardin = 0;
 	new_job->standardout = 1;
 	new_job->standarderror = 2;
-
 
 	return new_job;
 

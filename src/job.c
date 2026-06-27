@@ -21,6 +21,8 @@ typedef struct process
   char completed;             /* true if process has completed */
   char stopped;               /* true if process has stopped */
   int status;                 /* reported status value */
+
+	char *infile, *outfile, *errorfile;
 } process;
 
 typedef struct job

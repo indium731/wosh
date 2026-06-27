@@ -8,6 +8,7 @@
 #include <limits.h>
 #include <termios.h>
 #include <errno.h>
+#include <fcntl.h>
 
 #include "job.h"
 #include "builtins.h"
@@ -78,6 +79,7 @@ void launch_process (process *p, pid_t pgid,
       signal (SIGCHLD, SIG_DFL);
     }
 
+
   /* Set the standard input/output channels of the new process.  */
   if (infile != STDIN_FILENO)
     {
@@ -94,14 +96,19 @@ void launch_process (process *p, pid_t pgid,
       dup2 (errfile, STDERR_FILENO);
       close (errfile);
     }
-
-	//check if the process to be launched is part of the builtins
-	//if so just return since this is run from a fork and so the parent process should run the builtin
-  for (int i = 0; i < wosh_num_builtins(); i++) {
-    if (strcmp(p->argv[0], builtin_str[i]) == 0) {
-			exit (1);
-    }
-  }
+	//check if process to be launched has redirected I/O;
+	if (p->infile != NULL)
+	{
+		infile = open(p->infile, O_RDONLY | O_CREAT | O_TRUNC, 0644);
+    dup2 (infile, STDIN_FILENO);
+    close (infile);
+	}
+	if (p->outfile != NULL)
+	{
+		outfile = open(p->outfile, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    dup2 (outfile, STDOUT_FILENO);
+    close (outfile);
+	}
 
   /* Exec the new process.  Make sure we exit.  */
   execvp (p->argv[0], p->argv);
@@ -148,6 +155,7 @@ void launch_job (job *j, int foreground)
 					continue;
 				}
 			}
+
       /* Fork the child processes.  */
       pid = fork ();
       if (pid == 0)
