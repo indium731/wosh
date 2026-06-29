@@ -1,5 +1,7 @@
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/stat.h>
+#include <dirent.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -8,6 +10,7 @@
 #include <limits.h>
 #include <termios.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include "job.h"
 #include "launch.h"
@@ -60,22 +63,8 @@ char **wosh_split_line(char *line)
   line_start = &line_start[strcspn(line_start, WOSH_TOK_DELIM)]+1;
   while (token != NULL) {
 
-		if (token[0] == '~')
-		{
-			tokens[position] = getenv("HOME");
-		}else if (token[0] == '$'){
-			if (getenv(&token[1]) != NULL)
-			{
-				tokens[position] = getenv(&token[1]);
-			}else{
-				if (get_var(&token[1]) == NULL)
-					tokens[position] = token;
-				else tokens[position] = get_var(&token[1]);
-			}
 
-		}else{
-    	tokens[position] = token;
-		}
+    tokens[position] = token;
     position++;
 
     if (position >= bufsize) {
@@ -100,6 +89,247 @@ char **wosh_split_line(char *line)
   tokens[position] = NULL;
   return tokens;
 }
+
+
+/*
+ *
+ * globbing helper functions
+ *
+ */ 
+
+#define WOSH_STAR '*'
+
+bool has_glob(const char *token)
+{
+	if (strchr(token, WOSH_STAR))
+		return true;
+	return false;
+}
+
+int is_dir(const char *path)
+{
+  struct stat st;
+  return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
+}
+
+
+int match_star(const char *pattern, const char *name)
+{
+  if (*pattern == '\0')
+    return *name == '\0';
+
+  if (*pattern == '*') {
+    pattern++;
+
+    if (*pattern == '\0')
+      return 1;
+
+    while (*name) {
+      if (match_star(pattern, name))
+        return 1;
+      name++;
+    }
+
+  	return match_star(pattern, name);
+  }
+
+  if (*pattern == *name)
+    return match_star(pattern + 1, name + 1);
+
+  return 0;
+}
+
+void add_arg(char ***args, int *cap, const char *s)
+{
+	int count = 0;
+	while(args[0][count] != NULL)
+	{
+		count++;
+	}
+  if (count + 1 >= *cap) {
+    *cap *= 2;
+    *args = realloc(*args, sizeof(char *) * (*cap));
+    if (!*args) {
+      perror("realloc");
+      exit(1);
+    }
+	}
+
+	args[0][count] = strdup(s);
+  count++;
+  args[0][count] = NULL;
+}
+
+void join_path(char *out, size_t size, const char *a, const char *b)
+{
+    if (strcmp(a, "") == 0)
+        snprintf(out, size, "%s", b);
+    else
+        snprintf(out, size, "%s/%s", a, b);
+}
+
+void expand_glob_recursive(
+  const char *base,
+  char **parts,
+  int index,
+  int part_count,
+  char ***results,
+  int *result_cap
+) {
+  if (index == part_count) {
+    add_arg(results, result_cap, base);
+    return;
+  }
+
+  const char *pattern = parts[index];
+
+  if (!has_glob(pattern)) {
+    char next[1024];
+    join_path(next, sizeof(next), base, pattern);
+
+    if (index == part_count - 1 || is_dir(next)) {
+      expand_glob_recursive(
+        next,
+        parts,
+        index + 1,
+        part_count,
+        results,
+        result_cap
+      );
+    }
+
+    return;
+  }
+
+  const char *dir_to_open = strcmp(base, "") == 0 ? "." : base;
+
+  DIR *dir = opendir(dir_to_open);
+  if (!dir)
+    return;
+
+  struct dirent *entry;
+
+  while ((entry = readdir(dir)) != NULL) {
+    const char *name = entry->d_name;
+
+    if (name[0] == '.' && pattern[0] != '.')
+      continue;
+
+    if (!match_star(pattern, name))
+      continue;
+
+    char next[1024];
+    join_path(next, sizeof(next), base, name);
+
+    if (index == part_count - 1) {
+      add_arg(results, result_cap, next);
+    } else {
+      if (is_dir(next)) {
+        expand_glob_recursive(
+          next,
+          parts,
+          index + 1,
+          part_count,
+          results,
+          result_cap
+        );
+      }
+    }
+  }
+
+  closedir(dir);
+}
+
+char **expand_one_glob(const char *token)
+{
+  char *copy = strdup(token);
+
+  int cap = 8;
+  int count = 0;
+  char **parts = malloc(sizeof(char *) * cap);
+
+  char *part = strtok(copy, "/");
+
+  while (part) {
+    if (count >= cap) {
+      cap *= 2;
+      parts = realloc(parts, sizeof(char *) * cap);
+    }
+
+    parts[count++] = part;
+    part = strtok(NULL, "/");
+  }
+
+  int result_cap = 8;
+  char **results = malloc(sizeof(char *) * result_cap);
+  results[0] = NULL;
+
+  expand_glob_recursive(
+    "",
+    parts,
+    0,
+    count,
+    &results,
+    &result_cap
+  );
+
+  free(parts);
+  free(copy);
+
+  return results;
+}
+/*
+ *
+ * expand the input with globbing and the like
+ *
+ */ 
+
+
+char **wosh_parse_line(char **tokens)
+{
+  int cap = 16;
+  char **argv = malloc(sizeof(char *) * cap);
+  argv[0] = NULL;
+
+  for (int i = 0; tokens[i] != NULL; i++) {
+
+		if (tokens[i][0] == '~')
+		{
+			tokens[i] = getenv("HOME");
+		}else if (tokens[i][0] == '$')
+		{
+			if (getenv(&tokens[i][1]) != NULL)
+			{
+				tokens[i] = getenv(&tokens[i][1]);
+			}else if (get_var(&tokens[i][1]) != NULL)
+				tokens[i] = get_var(&tokens[i][1]);
+		}
+
+  	if (has_glob(tokens[i])) {
+    	int glob_count = 0;
+    	char **matches = expand_one_glob(tokens[i]);
+
+			while (matches[glob_count] != NULL){
+				glob_count++;
+			}
+
+	    if (glob_count == 0) {
+	      add_arg(&argv, &cap, tokens[i]);
+	    } else {
+	      for (int j = 0; j < glob_count; j++) {
+	        add_arg(&argv, &cap, matches[j]);
+	        free(matches[j]);
+	      }
+	    }
+
+	    free(matches);
+	  } else {
+      add_arg(&argv, &cap, tokens[i]);
+    }
+	}
+  return argv;
+}
+
 
 /*
  *
@@ -186,6 +416,7 @@ process *wosh_create_processes(char **tokens)
 
 	return processes;
 }
+
 
 
 

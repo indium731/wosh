@@ -20,6 +20,7 @@
 void wosh_loop(void)
 {
   char *line;
+	char **tokens;
   char **args;
   char cwd[PATH_MAX];
 	job *curr_job;
@@ -33,12 +34,14 @@ void wosh_loop(void)
 		printf("%s > ", basename(cwd));
 		fflush(stdout);
     line = wosh_read_line();
-    args = wosh_split_line(line);
+    tokens = wosh_split_line(line);
+		args = wosh_parse_line(tokens);
 		processes = wosh_create_processes(args);
 		curr_job = wosh_create_job(processes);
 		launch_job(curr_job, 1);
 
     free(line);
+		free(tokens);
     free(args);
   } while (1);
 }
