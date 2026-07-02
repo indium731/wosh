@@ -14,7 +14,6 @@
 
 #include "job.h"
 #include "launch.h"
-#include "builtins.h"
 #include "variables.h"
 
 /**
@@ -278,6 +277,8 @@ char **expand_one_glob(const char *token)
 
   return results;
 }
+
+
 /*
  *
  * expand the input with globbing and the like
@@ -399,7 +400,7 @@ process *wosh_create_processes(char **tokens)
                 tokens[args_counter + 2]);
         	return NULL;
     		}
-    		args_counter += 2;
+    		args_counter = 0;
 			}
 		args_counter++;
 		curr_pointer = tokens[args_counter];

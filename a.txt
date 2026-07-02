@@ -1,5 +1,0 @@
-a.txt
-Dockerfile
-Makefile
-README.md
-src

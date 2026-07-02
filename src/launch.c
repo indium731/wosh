@@ -79,6 +79,13 @@ void launch_process (process *p, pid_t pgid,
       signal (SIGCHLD, SIG_DFL);
     }
 
+		//check if the process to be launched is part of the builtins
+		//if so exit out
+		for (int i = 0; i < wosh_num_builtins(); i++) {
+			if (strcmp(p->argv[0], builtin_str[i]) == 0) {
+				exit (0);
+			}
+		}
 
   /* Set the standard input/output channels of the new process.  */
   if (infile != STDIN_FILENO)
@@ -152,7 +159,6 @@ void launch_job (job *j, int foreground)
 			for (int i = 0; i < wosh_num_builtins(); i++) {
 				if (strcmp(p->argv[0], builtin_str[i]) == 0) {
 					(*builtin_func[i])(p->argv, infile, outfile, j->standarderror);
-					continue;
 				}
 			}
 
