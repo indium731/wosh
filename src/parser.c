@@ -96,23 +96,23 @@ char **wosh_split_line(char *line)
  *
  */ 
 
-#define WOSH_STAR '*'
+#define WOSH_GLOB_PATTERNS "*?"
 
 bool has_glob(const char *token)
 {
-	if (strchr(token, WOSH_STAR))
+	if (strpbrk(token, WOSH_GLOB_PATTERNS))
 		return true;
 	return false;
 }
 
-int is_dir(const char *path)
+bool is_dir(const char *path)
 {
   struct stat st;
   return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
 
-int match_star(const char *pattern, const char *name)
+bool match_glob(const char *pattern, const char *name)
 {
   if (*pattern == '\0')
     return *name == '\0';
@@ -121,22 +121,30 @@ int match_star(const char *pattern, const char *name)
     pattern++;
 
     if (*pattern == '\0')
-      return 1;
+      return true;
 
     while (*name) {
-      if (match_star(pattern, name))
-        return 1;
+      if (match_glob(pattern, name))
+        return true;
       name++;
     }
 
-  	return match_star(pattern, name);
+  	return match_glob(pattern, name);
+  }
+
+	if (*pattern == '?') {
+    if (*name == '\0')
+      return false;
+
+    return match_glob(pattern + 1, name + 1);
   }
 
   if (*pattern == *name)
-    return match_star(pattern + 1, name + 1);
+    return match_glob(pattern + 1, name + 1);
 
-  return 0;
+  return false;
 }
+
 
 void add_arg(char ***args, int *cap, const char *s)
 {
@@ -214,7 +222,7 @@ void expand_glob_recursive(
     if (name[0] == '.' && pattern[0] != '.')
       continue;
 
-    if (!match_star(pattern, name))
+    if (!match_glob(pattern, name))
       continue;
 
     char next[1024];
