@@ -369,6 +369,12 @@ process *wosh_create_processes(char **tokens)
 	{
 		if (*curr_pointer == WOSH_PIPE)
 		{
+			if (tokens[args_counter + 1] == NULL)
+			{
+				fprintf(stderr, "syntax error: expected filename after |\n");
+				return NULL;
+			}
+
 
 			processes_backup = processes;
 			processes = (process*)realloc(processes, (process_counter+1) * sizeof(process));
@@ -396,7 +402,10 @@ process *wosh_create_processes(char **tokens)
         	return NULL;
     		}
 
+
+				processes[process_counter-1].infile = NULL;
     		processes[process_counter - 1].outfile = tokens[args_counter + 1];
+				processes[process_counter-1].errorfile = NULL;
 
     		tokens[args_counter] = NULL;
 
