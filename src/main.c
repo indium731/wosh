@@ -37,11 +37,6 @@ void wosh_loop(void)
     line = wosh_read_line();
     tokens = wosh_lex_line(line);
 		args = wosh_parse_line(tokens);
-		for (int i = 0; args[i] == NULL; i++){
-			printf(args[i]);
-			printf("h");
-			fflush(stdout);
-		}
 		processes = wosh_create_processes(args);
 		curr_job = wosh_create_job(processes);
 		launch_job(curr_job, 1);
