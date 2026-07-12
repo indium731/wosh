@@ -15,6 +15,7 @@
 #include "job.h"
 #include "launch.h"
 #include "variables.h"
+#include "lexer.h"
 
 /**
    @brief Read a line of input from stdin.
@@ -33,60 +34,6 @@ char *wosh_read_line(void)
     }
   }
   return line;
-}
-
-#define WOSH_TOK_BUFSIZE 64
-#define WOSH_TOK_DELIM " \t\r\n\a"
-#define WOSH_TOK_DELIM_FULL " \t\r\n\a\'"
-/**
-   @brief Split a line into tokens (very naively).
-   @param line The line.
-   @return Null-terminated array of tokens.
- */
-
-char **wosh_split_line(char *line)
-{
-  int bufsize = WOSH_TOK_BUFSIZE, position = 0;
-  char **tokens = malloc(bufsize * sizeof(char*));
-  char *token, **tokens_backup;
-  char *line_start;
-
-  if (!tokens) {
-    fprintf(stderr, "wosh: allocation error\n");
-    exit(EXIT_FAILURE);
-  }
-
-  line_start = strdup(line);
-
-  token = strtok(line, WOSH_TOK_DELIM);
-  line_start = &line_start[strcspn(line_start, WOSH_TOK_DELIM)]+1;
-  while (token != NULL) {
-
-
-    tokens[position] = token;
-    position++;
-
-    if (position >= bufsize) {
-      bufsize += WOSH_TOK_BUFSIZE;
-      tokens_backup = tokens;
-      tokens = realloc(tokens, bufsize * sizeof(char*));
-      if (!tokens) {
-				free(tokens_backup);
-        exit(EXIT_FAILURE);
-      }
-    }
-
-
-    if (line_start[0] == '\''){
-	    token = strtok(&line_start[1], "\'");
-	    line_start = &line_start[strcspn(&line_start[1], "\'")]+1;
-    }else{
-    	token = strtok(NULL, WOSH_TOK_DELIM);
-			line_start = &line_start[strcspn(line_start, WOSH_TOK_DELIM)]+1;
-    }
-  }
-  tokens[position] = NULL;
-  return tokens;
 }
 
 
@@ -163,6 +110,39 @@ void add_arg(char ***args, int *cap, const char *s)
 	}
 
 	args[0][count] = strdup(s);
+  count++;
+  args[0][count] = NULL;
+}
+
+
+void add_arg_token(char ***args, int *cap, Token token)
+{
+	int count = 0;
+	char *s = malloc(sizeof (char) * (token.lexeme_len + 1));
+
+	if (s == NULL)
+	{
+		perror("malloc");
+		exit(1);
+	}
+
+	memcpy(s, token.lexeme, token.lexeme_len);
+	s[token.lexeme_len] = '\0';
+
+	while(args[0][count] != NULL)
+	{
+		count++;
+	}
+  if (count + 1 >= *cap) {
+    *cap *= 2;
+    *args = realloc(*args, sizeof(char *) * (*cap));
+    if (!*args) {
+      perror("realloc");
+      exit(1);
+    }
+	}
+
+	args[0][count] = s;
   count++;
   args[0][count] = NULL;
 }
@@ -294,36 +274,36 @@ char **expand_one_glob(const char *token)
  */ 
 
 
-char **wosh_parse_line(char **tokens)
+char **wosh_parse_line(Token *tokens)
 {
   int cap = 16;
   char **argv = malloc(sizeof(char *) * cap);
   argv[0] = NULL;
 
-  for (int i = 0; tokens[i] != NULL; i++) {
+  for (int i = 0; tokens[i].type != TOK_EOF; i++) {
 
-		if (tokens[i][0] == '~')
+		if (tokens[i].lexeme[0] == '~')
 		{
-			tokens[i] = getenv("HOME");
-		}else if (tokens[i][0] == '$')
+			tokens[i].lexeme = getenv("HOME");
+		}else if (tokens[i].lexeme[0] == '$')
 		{
-			if (getenv(&tokens[i][1]) != NULL)
+			if (getenv(&tokens[i].lexeme[1]) != NULL)
 			{
-				tokens[i] = getenv(&tokens[i][1]);
-			}else if (get_var(&tokens[i][1]) != NULL)
-				tokens[i] = get_var(&tokens[i][1]);
+				tokens[i].lexeme = getenv(&tokens[i].lexeme[1]);
+			}else if (get_var(&tokens[i].lexeme[1]) != NULL)
+				tokens[i].lexeme = get_var(&tokens[i].lexeme[1]);
 		}
 
-  	if (has_glob(tokens[i])) {
+  	if (has_glob(tokens[i].lexeme)) {
     	int glob_count = 0;
-    	char **matches = expand_one_glob(tokens[i]);
+    	char **matches = expand_one_glob(tokens[i].lexeme);
 
 			while (matches[glob_count] != NULL){
 				glob_count++;
 			}
 
 	    if (glob_count == 0) {
-	      add_arg(&argv, &cap, tokens[i]);
+	      add_arg_token(&argv, &cap, tokens[i]);
 	    } else {
 	      for (int j = 0; j < glob_count; j++) {
 	        add_arg(&argv, &cap, matches[j]);
@@ -333,7 +313,7 @@ char **wosh_parse_line(char **tokens)
 
 	    free(matches);
 	  } else {
-      add_arg(&argv, &cap, tokens[i]);
+      add_arg_token(&argv, &cap, tokens[i]);
     }
 	}
   return argv;

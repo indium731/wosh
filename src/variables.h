@@ -7,7 +7,7 @@
 typedef struct variable
 {
 	char *name;
-	char *data
+	char *data;
 } variable;
 
 int get_var_str_size();

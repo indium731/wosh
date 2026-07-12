@@ -13,6 +13,7 @@
 #include "launch.h"
 #include "builtins.h"
 #include "parser.h"
+#include "lexer.h"
 
 /**
    @brief Loop getting input and executing it.
@@ -20,7 +21,7 @@
 void wosh_loop(void)
 {
   char *line;
-	char **tokens;
+	Token *tokens;
   char **args;
   char cwd[PATH_MAX];
 	job *curr_job;
@@ -34,8 +35,13 @@ void wosh_loop(void)
 		printf("%s > ", basename(cwd));
 		fflush(stdout);
     line = wosh_read_line();
-    tokens = wosh_split_line(line);
+    tokens = wosh_lex_line(line);
 		args = wosh_parse_line(tokens);
+		for (int i = 0; args[i] == NULL; i++){
+			printf(args[i]);
+			printf("h");
+			fflush(stdout);
+		}
 		processes = wosh_create_processes(args);
 		curr_job = wosh_create_job(processes);
 		launch_job(curr_job, 1);
