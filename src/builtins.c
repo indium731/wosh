@@ -38,6 +38,17 @@ int wosh_num_builtins() {
   return sizeof(builtin_str) / sizeof(char *);
 }
 
+int is_builtin (char **argv)
+{
+	for (int i = 0; i < wosh_num_builtins(); i++) 
+	{
+	if (strcmp(argv[0], builtin_str[i]) == 0) 
+		return 1;
+	}
+	return 0;
+}
+
+
 /*
   Builtin function implementations.
 */
