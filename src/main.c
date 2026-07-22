@@ -39,9 +39,9 @@ void wosh_loop(void)
 		args = wosh_parse_line(tokens);
 		processes = wosh_create_processes(args);
 		curr_job = wosh_create_job(processes);
-		if (is_builtin(curr_job->first_process->argv) && (!curr_job->first_process->next))
+		if (is_builtin(curr_job->first_process->argv[0]) && (!curr_job->first_process->next))
 		{
-			launch_builtin(curr_job, 1);
+			launch_builtin(curr_job->first_process->argv);
 		} else {
 			launch_job(curr_job, 1);
 		}

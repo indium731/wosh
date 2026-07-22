@@ -51,6 +51,14 @@ void put_job_in_background (job *j, int cont)
       perror ("kill (SIGCONT)");
 }
 
+void launch_builtin (char **args)
+{
+	for (int i = 0; i < wosh_num_builtins(); i++) {
+		if (strcmp(args[0], builtin_str[i]) == 0) {
+			(*builtin_func[i])(args, STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO);
+		}
+	}
+}
 
 void launch_process (process *p, pid_t pgid,
                 int infile, int outfile, int errfile,
@@ -110,6 +118,12 @@ void launch_process (process *p, pid_t pgid,
     close (outfile);
 	}
 
+	if (is_builtin(p->argv[0]))
+	{
+		launch_builtin (p->argv);
+		exit (0);
+	}
+
   /* Exec the new process.  Make sure we exit.  */
   execvp (p->argv[0], p->argv);
   perror ("execvp");
@@ -126,14 +140,6 @@ void continue_job (job *j, int foreground)
     put_job_in_background (j, 1);
 }
 
-void launch_builtin (job *j, int foreground)
-{
-	for (int i = 0; i < wosh_num_builtins(); i++) {
-		if (strcmp(j->first_process->argv[0], builtin_str[i]) == 0) {
-			(*builtin_func[i])(j->first_process->argv, j->standardin, j->standardout, j->standarderror);
-		}
-	}
-}
 
 void launch_job (job *j, int foreground)
 {

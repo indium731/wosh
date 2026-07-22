@@ -6,7 +6,7 @@ int wosh_help(char **args, int infile, int outfile, int errfile);
 int wosh_exit(char **args, int infile, int outfile, int errfile);
 int wosh_echo(char **args, int infile, int outfile, int errfile);
 int wosh_num_builtins();
-int is_builtin (char **argv);
+int is_builtin (char *argv);
 
 extern char *builtin_str[];
 
