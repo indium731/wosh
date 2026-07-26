@@ -1,6 +1,7 @@
 #include <string.h>
 #include <stdlib.h>
 
+
 typedef enum
 {
 	TOK_WORD,
@@ -52,7 +53,7 @@ Token scan_token (char *start, char **curr)
 {
 	Token token;
 	token = create_token (TOK_ERROR, "", -1);
-	(*curr)++;
+	//(*curr)++;
 
 	if (**curr == '\0')
 	{
@@ -89,7 +90,7 @@ Token scan_token (char *start, char **curr)
 			token.type = TOK_WORD;
 			token.lexeme = start;
 			token.lexeme_len = get_lexeme_len(start);
-			*curr = *curr + token.lexeme_len;
+			*curr = *curr + token.lexeme_len+1;
 			return token;
 
 	}

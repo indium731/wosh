@@ -5,6 +5,8 @@ int wosh_cd(char **args, int infile, int outfile, int errfile);
 int wosh_help(char **args, int infile, int outfile, int errfile);
 int wosh_exit(char **args, int infile, int outfile, int errfile);
 int wosh_echo(char **args, int infile, int outfile, int errfile);
+int wosh_fg (char **args, int infile, int outfile, int errfile);
+int wosh_bg (char **args, int infile, int outfile, int errfile);
 int wosh_num_builtins();
 int is_builtin (char *argv);
 

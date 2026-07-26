@@ -34,8 +34,10 @@ extern struct termios shell_tmodes;
 extern int shell_terminal;
 extern int shell_is_interactive;
 
+void add_job (job *j);
 void wait_for_job (job* j);
-job * find_job (pid_t pgid);
+job *find_job (pid_t pgid);
+job *find_last_job ();
 int job_is_stopped (job *j);
 int job_is_completed (job *j);
 int mark_process_status (pid_t pid, int status);

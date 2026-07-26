@@ -45,10 +45,12 @@ void wosh_loop(void)
 		} else {
 			launch_job(curr_job, 1);
 		}
+		add_job(curr_job);
 
     free(line);
 		free(tokens);
     free(args);
+
   } while (1);
 }
 

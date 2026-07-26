@@ -9,6 +9,9 @@
 #include <termios.h>
 #include <errno.h>
 
+
+#include "launch.h"
+
 /*
   Function Declarations for builtin shell commands:
  */
@@ -16,6 +19,8 @@ int wosh_cd(char **args, int infile, int outfile, int errfile);
 int wosh_help(char **args, int infile, int outfile, int errfile);
 int wosh_exit(char **args, int infile, int outfile, int errfile);
 int wosh_echo(char **args, int infile, int outfile, int errfile);
+int wosh_fg (char **args, int infile, int outfile, int errfile);
+int wosh_bg (char **args, int infile, int outfile, int errfile);
 
 /*
   List of builtin commands, followed by their corresponding functions.
@@ -24,14 +29,18 @@ char *builtin_str[] = {
   "cd",
   "help",
   "exit",
-	"echo"
+	"echo",
+	"fg",
+	"bg"
 };
 
 int (*builtin_func[]) (char **, int, int , int) = {
   &wosh_cd,
   &wosh_help,
   &wosh_exit,
-	&wosh_echo
+	&wosh_echo,
+	&wosh_fg,
+	&wosh_bg
 };
 
 int wosh_num_builtins() {
@@ -67,7 +76,7 @@ int wosh_cd(char **args, int infile, int outfile, int errfile)
       perror("wosh");
     }
   }
-  return 1;
+  return 0;
 }
 
 /**
@@ -86,7 +95,7 @@ int wosh_help(char **args, int infile, int outfile, int errfile)
   }
 
   fprintf(stdout, "Use the man command for information on other programs.\n");
-  return 1;
+  return 0;
 }
 
 /**
@@ -115,6 +124,30 @@ int wosh_echo (char **args, int infile, int outfile, int errfile)
 	}
 	write(outfile, "\n", 1);
 
-	return 1;
+	return 0;
 }
 
+int wosh_fg (char **args, int infile, int outfile, int errfile)
+{
+	if (!args[1])
+	{
+		job *j = find_last_job ();
+		if (!j)
+			return 1;
+		continue_job (j, 1);
+		return 0;
+	}
+	return 1;
+	//fg args not implemented
+}
+
+int wosh_bg (char **args, int infile, int outfile, int errfile)
+{
+	if (!args[1])
+	{
+		put_job_in_background (find_last_job (), 0);
+		return 0;
+	}
+	return 1;
+	//fg args not implemented
+}

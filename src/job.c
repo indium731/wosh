@@ -21,7 +21,6 @@ typedef struct process
   char completed;             /* true if process has completed */
   char stopped;               /* true if process has stopped */
   int status;                 /* reported status value */
-
 	char *infile, *outfile, *errorfile;
 } process;
 
@@ -36,7 +35,9 @@ typedef struct job
   int standardin, standardout, standarderror;  /* standard i/o channels */
 } job;
 
-job *first_job = NULL;
+int job_length = 0;
+int job_capacity = 32;
+job **first_job = NULL;
 
 pid_t shell_pgid;
 struct termios shell_tmodes;
@@ -47,26 +48,79 @@ int shell_is_interactive;
  * Function prototypes
  */
 
-void wait_for_job (job* j);
+void wait_for_job (job *j);
 
 /* 
  * utility functions for operating on job objects
  */
 
-job *
-find_job (pid_t pgid)
+void add_job (job *j)
+{
+	if (!first_job)
+	{
+		first_job = (job **) malloc (sizeof(job*)*job_capacity);
+	}
+
+	job **backup_job;
+	if (job_length == job_capacity)
+	{
+		backup_job = first_job;
+		first_job = (job**) realloc (first_job, sizeof(job*) * (job_capacity*2));
+		if (!first_job)
+		{
+			free (backup_job);
+			exit (1);
+		}
+		job_capacity *= 2;
+	}
+	first_job[job_length] = j;
+	job_length++;
+
+
+
+	/*
+	if (!first_job)
+	{
+		first_job = (job*) malloc (sizeof(job) * job_capacity);
+	}
+	job *backup_job;
+	if (job_length == job_capacity)
+	{
+		backup_job = first_job;
+		first_job = (job*) realloc (first_job, sizeof(job) * (job_length+1));
+		if (!first_job)
+		{
+			free (backup_job);
+			exit (1);
+		}
+		job_capacity *= 2;
+	}
+	first_job[job_length] = *j;
+	job_length++;
+	*/
+
+}
+
+
+job *find_job (pid_t pgid)
 {
   job *j;
 
-  for (j = first_job; j; j = j->next)
+  for (j = first_job[0]; j; j = j->next)
     if (j->pgid == pgid)
       return j;
   return NULL;
 }
 
+job *find_last_job ()
+{
+	if (job_length == 0)
+		return NULL;
+	return first_job[job_length-1];
+}
 
-int
-job_is_stopped (job *j)
+
+int job_is_stopped (job *j)
 {
   process *p;
 
@@ -76,8 +130,7 @@ job_is_stopped (job *j)
   return 1;
 }
 
-int
-job_is_completed (job *j)
+int job_is_completed (job *j)
 {
   process *p;
 
@@ -88,8 +141,7 @@ job_is_completed (job *j)
 }
 
 
-int
-mark_process_status (pid_t pid, int status)
+int mark_process_status (pid_t pid, int status)
 {
   job *j;
   process *p;
@@ -98,7 +150,7 @@ mark_process_status (pid_t pid, int status)
   if (pid > 0)
     {
       /* Update the record for the process.  */
-      for (j = first_job; j; j = j->next)
+      for (j = first_job[0]; j; j = j->next)
         for (p = j->first_process; p; p = p->next)
           if (p->pid == pid)
             {
@@ -132,8 +184,7 @@ mark_process_status (pid_t pid, int status)
 /* Check for processes that have status information available,
    without blocking.  */
 
-void
-update_status (void)
+void update_status (void)
 {
   int status;
   pid_t pid;
@@ -144,14 +195,13 @@ update_status (void)
 }
 
 
-void
-wait_for_job (job *j)
+void wait_for_job (job *j)
 {
   int status;
   pid_t pid;
 
   do
-    pid = waitpid (-1, &status, WUNTRACED);
+    pid = waitpid (WAIT_ANY, &status, WUNTRACED);
   while (!mark_process_status (pid, status)
          && !job_is_stopped (j)
          && !job_is_completed (j));
@@ -170,7 +220,7 @@ void do_job_notification (void)
   update_status ();
 
   jlast = NULL;
-  for (j = first_job; j; j = jnext)
+  for (j = first_job[0]; j; j = jnext)
     {
       jnext = j->next;
 
@@ -180,7 +230,7 @@ void do_job_notification (void)
         if (jlast)
           jlast->next = jnext;
         else
-          first_job = jnext;
+          first_job[0] = jnext;
         free (j);
       }
 
